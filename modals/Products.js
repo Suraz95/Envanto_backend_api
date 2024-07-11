@@ -6,7 +6,7 @@ const optionsSchema = new mongoose.Schema({
   discount: { type: Number, required: true },
   total_stock: { type: Number, required: true },
   available_stock: { type: Number, required: true },
-  sold_stock: { type: Number, required: true }
+  sold_stock: { type: Number,default: 0}
 });
 
 const productSchema = new mongoose.Schema({
