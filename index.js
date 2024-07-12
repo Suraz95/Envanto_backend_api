@@ -1,9 +1,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const dotenv=require("dotenv")
+const dotenv = require("dotenv");
 const { Products } = require("./modals/Products");
-const {User}=require("./modals/User")
+const Contact = require("./modals/ContactUs");
+const { User } = require("./modals/User");
 const bcrypt = require("bcryptjs");
 const { body, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
@@ -17,7 +18,7 @@ app.get("/", (req, res) => {
   res.send("ok");
 });
 dotenv.config({
-  path: "./.env"
+  path: "./.env",
 });
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const validatePhoneNumber = (phone) => /^[7-9]\d{9}$/.test(phone);
@@ -43,22 +44,24 @@ mongoose
 // JWT Authorization
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: 'No token provided' });
+  if (!authHeader)
+    return res.status(401).json({ message: "No token provided" });
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
 
   try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = decoded;
-      next();
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
   } catch (error) {
-      res.status(401).json({ message: 'Unauthorized' });
+    res.status(401).json({ message: "Unauthorized" });
   }
 };
 
 // User Registration
 app.post(
-  "/register",[
+  "/register",
+  [
     body("name")
       .isLength({ min: 3 })
       .withMessage("Name should be at least 3 letters long")
@@ -86,7 +89,7 @@ app.post(
     const { name, username, phone, email, password, userType } = req.body;
 
     try {
-      const userExists = await User.findOne({ email, phone , name });
+      const userExists = await User.findOne({ email, phone, name });
       if (userExists)
         return res.status(400).json({ message: "User already exists" });
 
@@ -111,66 +114,80 @@ app.post(
 );
 
 // User Login
-app.post('/login', [
-  body('email').isEmail().withMessage('Please provide a valid email'),
-  body('password').notEmpty().withMessage('Password is required')
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
+app.post(
+  "/login",
+  [
+    body("email").isEmail().withMessage("Please provide a valid email"),
+    body("password").notEmpty().withMessage("Password is required"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
-  }
+    }
 
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  try {
+    try {
       const user = await User.findOne({ email });
-      if (!user) return res.status(400).json({ message: 'Invalid email or password' });
+      if (!user)
+        return res.status(400).json({ message: "Invalid email or password" });
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) return res.status(400).json({ message: 'Invalid email or password' });
+      if (!isPasswordValid)
+        return res.status(400).json({ message: "Invalid email or password" });
 
       const loginTimestamp = formatDate(new Date());
       user.timestamps.push({ login: loginTimestamp });
       await user.save();
 
-      const token = jwt.sign({ userId: user._id, role: user.userType }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign(
+        {
+          userId: user._id,
+          email: user.email,
+          username: user.username,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
 
-      res.status(200).json({ token});
-  } catch (error) {
+      res.status(200).json({ token });
+    } catch (error) {
       res.status(500).json({ message: error.message });
+    }
   }
-});
+);
 
 //  Logout Route
-app.post('/logout', [
-  body('email').isEmail().withMessage('Please provide a valid email')
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
+app.post(
+  "/logout",
+  [body("email").isEmail().withMessage("Please provide a valid email")],verifyToken,
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
-  }
+    }
 
-   const { email } = req.body;
-  
+    const { email } = req.body;
 
-  try {
+    try {
       const user = await User.findOne({ email });
-      if (!user) return res.status(400).json({ message: 'Invalid email' });
+      if (!user) return res.status(400).json({ message: "Invalid email" });
 
       const lastLoginIndex = user.timestamps.length - 1;
       if (lastLoginIndex >= 0 && !user.timestamps[lastLoginIndex].logout) {
-          user.timestamps[lastLoginIndex].logout = formatDate(new Date());
-          await user.save();
+        user.timestamps[lastLoginIndex].logout = formatDate(new Date());
+        await user.save();
       }
 
-
-      res.status(200).json({ message: 'Logout successful' });
-  } catch (error) {
+      res.status(200).json({ message: "Logout successful" });
+    } catch (error) {
       res.status(500).json({ message: error.message });
+    }
   }
-});
+);
 
-// Add   Products
+// Add Products
 app.post("/api/Products", async (req, res) => {
   const { cat_name, subCategories } = req.body;
 
@@ -215,6 +232,7 @@ app.post("/api/Products", async (req, res) => {
     return res.status(400).json({ message: error.message });
   }
 });
+  // Products
 app.get("/Products", async (req, res) => {
   try {
     const categories = await Products.find({}, "cat_name subCategories");
@@ -224,6 +242,51 @@ app.get("/Products", async (req, res) => {
     }
 
     res.status(200).json(categories);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+//  message
+app.post(
+  "/send-message",
+  [
+    body("phone")
+      .custom((value) => validatePhoneNumber(value))
+      .withMessage("Phone number should be in Indian format"),
+    body("email")
+      .custom((value) => validateEmail(value))
+      .withMessage("Invalid email format"),
+  ],
+  async (req, res) => {
+    const { name, email, phone, message } = req.body;
+
+    try {
+      const newContact = new Contact({
+        name,
+        phone,
+        email,
+        message,
+      });
+
+      await newContact.save();
+      res
+        .status(200)
+        .json({ success: true, message: "Message sent successfully" });
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  }
+);
+  //  get messages
+app.get("/messages", async (req, res) => {
+  try {
+    const messages = await Contact.find({});
+
+    if (!messages) {
+      return res.status(404).json({ message: "No categories found" });
+    }
+
+    res.status(200).json(messages);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
