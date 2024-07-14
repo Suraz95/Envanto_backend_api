@@ -30,8 +30,8 @@ const formatDate = (date) => {
   const year = d.getFullYear();
   let hours = d.getHours();
   const minutes = String(d.getMinutes()).padStart(2, "0");
-  const seconds = String(d.getSeconds()).padStart(2, "0"); 
-  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const seconds = String(d.getSeconds()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
   hours = hours % 12;
   hours = hours ? hours : 12; // the hour '0' should be '12'
   const formattedHours = String(hours).padStart(2, "0");
@@ -165,33 +165,29 @@ app.post(
 );
 
 //  Logout Route
-app.post(
-  "/logout",
-  [body("email").isEmail().withMessage("Please provide a valid email")],verifyToken,
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { email } = req.body;
-
-    try {
-      const user = await User.findOne({ email });
-      if (!user) return res.status(400).json({ message: "Invalid email" });
-
-      const lastLoginIndex = user.timestamps.length - 1;
-      if (lastLoginIndex >= 0 && !user.timestamps[lastLoginIndex].logout) {
-        user.timestamps[lastLoginIndex].logout = formatDate(new Date());
-        await user.save();
-      }
-
-      res.status(200).json({ message: "Logout successful" });
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
+app.post("/logout", verifyToken, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
   }
-);
+
+  const { email } = req.user;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Invalid email" });
+
+    const lastLoginIndex = user.timestamps.length - 1;
+    if (lastLoginIndex >= 0 && !user.timestamps[lastLoginIndex].logout) {
+      user.timestamps[lastLoginIndex].logout = formatDate(new Date());
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Logout successful" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // Add Products
 app.post("/api/Products", async (req, res) => {
@@ -238,7 +234,7 @@ app.post("/api/Products", async (req, res) => {
     return res.status(400).json({ message: error.message });
   }
 });
-  // Products
+// Products
 app.get("/Products", async (req, res) => {
   try {
     const categories = await Products.find({}, "cat_name subCategories");
@@ -283,7 +279,7 @@ app.post(
     }
   }
 );
-  //  get messages
+//  get messages
 app.get("/messages", async (req, res) => {
   try {
     const messages = await Contact.find({});
@@ -297,8 +293,8 @@ app.get("/messages", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-app.put("/wishlist",verifyToken, async (req, res) => {
-  const { prod_name } = req.body; 
+app.put("/wishlist", verifyToken, async (req, res) => {
+  const { prod_name } = req.body;
   try {
     const { email } = req.user; // User information from JWT
     // Find the user based on the email
@@ -318,7 +314,7 @@ app.put("/wishlist",verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-app.get("/wishlist",verifyToken, async (req, res) => {
+app.get("/wishlist", verifyToken, async (req, res) => {
   try {
     const { email } = req.user; // User information from JWT
     // Find the user based on the email
@@ -334,29 +330,77 @@ app.get("/wishlist",verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-app.delete("/wishlist",verifyToken, async (req, res) => {
+app.delete("/wishlist", verifyToken, async (req, res) => {
   const { prod_name } = req.body; // Extract book title from request body
-
   try {
-     const { email } = req.user; // User information from JWT
-
+    const { email } = req.user; // User information from JWT
     // Find the user based on the email
     const customer = await User.findOne({ email }); // Assuming you have a Customer model
-
     if (!customer) {
       return res.status(404).json({ error: "User not found" });
     }
-
     // Remove the book from the wishlist if it exists
     const index = customer.wishlist.indexOf(prod_name);
     if (index > -1) {
       customer.wishlist.splice(index, 1);
       await customer.save();
     }
-
     res.status(200).json(customer);
   } catch (error) {
     console.error("Error removing book from wishlist:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// ADD to Cart
+app.put("/add-to-cart", verifyToken, async (req, res) => {
+  const { prod_name, options_id } = req.body;
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { email } = req.user; // User information from JWT
+
+    // Find the user based on the email
+    const customer = await User.findOne({ email });
+    if (!customer) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if the product is already in the cart
+    const productInCart = customer.cart.find(
+      item => item.prod_name === prod_name && item.options_id === options_id
+    );
+
+    // If the product is not in the cart, add it
+    if (!productInCart) {
+      customer.cart.push({ prod_name, options_id });
+      await customer.save();
+    }
+
+    res.status(200).json(customer);
+  } catch (error) {
+    console.error("Error adding product to cart:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Get Cart
+app.get("/cart", verifyToken, async (req, res) => {
+  try {
+    const { email } = req.user; // User information from JWT
+    // Find the user based on the email
+    const customer = await User.findOne({ email });
+
+    if (!customer) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.status(200).json({ cart: customer.cart});
+  } catch (error) {
+    console.error("Error retrieving wishlist:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

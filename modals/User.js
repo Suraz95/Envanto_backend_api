@@ -14,7 +14,10 @@ const addressSchema = new mongoose.Schema({
     locality: { type: String },
     landmark: { type: String },
 });
-
+const cartschema=new mongoose.Schema({
+    prod_name:{type:String},
+    options_id:{type:String}
+})
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: Number, required: true, unique: true },
@@ -25,7 +28,7 @@ const userSchema = new mongoose.Schema({
     addresses: [addressSchema],
     timestamps: [timestampSchema],
     wishlist: [String],
-    cart:[String]
+    cart:[cartschema]
 });
 
 const User = mongoose.model('User', userSchema);
