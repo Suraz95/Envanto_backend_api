@@ -293,6 +293,7 @@ app.get("/messages", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+//  Add to wishlist
 app.put("/wishlist", verifyToken, async (req, res) => {
   const { prod_name } = req.body;
   try {
@@ -314,6 +315,7 @@ app.put("/wishlist", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+// Get wishlist
 app.get("/wishlist", verifyToken, async (req, res) => {
   try {
     const { email } = req.user; // User information from JWT
@@ -330,6 +332,7 @@ app.get("/wishlist", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+//  delete from wishlist
 app.delete("/wishlist", verifyToken, async (req, res) => {
   const { prod_name } = req.body; // Extract book title from request body
   try {
@@ -401,6 +404,31 @@ app.get("/cart", verifyToken, async (req, res) => {
     res.status(200).json({ cart: customer.cart});
   } catch (error) {
     console.error("Error retrieving wishlist:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+//  Delete from Cart
+app.delete("/delete-cart", verifyToken, async (req, res) => {
+  const { prod_name } = req.body;
+
+  try {
+    const { email } = req.user; // User information from JWT
+
+    // Find the user based on the email
+    const customer = await User.findOne({ email });
+    if (!customer) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Filter out the item(s) from the cart based on prod_name
+    customer.cart = customer.cart.filter(item => item.prod_name !== prod_name);
+
+    await customer.save();
+
+    res.status(200).json(customer);
+  } catch (error) {
+    console.error("Error removing item from cart:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
